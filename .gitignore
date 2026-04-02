@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Grafana
+grafana/data/
+grafana/logs/
+grafana/plugins/
+
+# Prometheus
+prometheus/data/
+
+# AlertManager
+alertmanager/data/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.nyc_output/
