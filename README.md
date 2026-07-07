@@ -1,5 +1,10 @@
 # Infra Monitoring Dashboard
 
+[![CI](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/ci.yml)
+[![Security Hygiene](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/security-hygiene.yml/badge.svg)](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/security-hygiene.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+
 A production-style infrastructure monitoring dashboard that centralizes **system health, service status, resource usage, and alert visibility** in one place.
 
 ## Overview
@@ -174,3 +179,23 @@ If this repository is part of a portfolio, consider adding:
 - Sample alert payloads
 - API contract documentation
 - Accessibility and performance notes
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[App / Host Exporters]
+    B[Node Exporter]
+    C[cAdvisor]
+    A --> P[Prometheus]
+    B --> P
+    C --> P
+    P --> AM[Alertmanager]
+    P --> G[Grafana Dashboards]
+    AM --> N[Notifications: Slack / Email / PagerDuty]
+    L[Log Shippers] --> ES[(Elasticsearch)]
+    ES --> K[Kibana]
+```
+
+*Prometheus scrapes metrics from exporters, Alertmanager fans out alerts, and
+Grafana + Kibana provide unified metric and log visibility.*
