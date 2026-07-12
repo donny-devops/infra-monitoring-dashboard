@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import type { Host, Alert, Stats } from "@/lib/api/types";
 import HostCard from "@/components/dashboard/HostCard";
-import { cn, severityBg, statusBg } from "@/lib/utils";
+import { cn, severityBg } from "@/lib/utils";
 import { Server, Bell, AlertTriangle, Wrench } from "lucide-react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
