@@ -1,11 +1,47 @@
-# Infra Monitoring Dashboard
+# 📈 Infra Monitoring Dashboard
 
-[![CI](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/ci.yml)
-[![Security Hygiene](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/security-hygiene.yml/badge.svg)](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/security-hygiene.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/donny-devops/infra-monitoring-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/donny-devops/infra-monitoring-dashboard/actions)
+[![Coverage](https://img.shields.io/codecov/c/github/donny-devops/infra-monitoring-dashboard?style=flat-square)](https://codecov.io/gh/donny-devops/infra-monitoring-dashboard)
+[![Release](https://img.shields.io/github/v/release/donny-devops/infra-monitoring-dashboard?style=flat-square)](https://github.com/donny-devops/infra-monitoring-dashboard/releases)
+[![License](https://img.shields.io/github/license/donny-devops/infra-monitoring-dashboard?style=flat-square)](LICENSE)
 
+> Real-time infrastructure observability stack integrating Prometheus, OpenTelemetry, Grafana, and automated alert routing.
 
-A production-style infrastructure monitoring dashboard that centralizes **system health, service status, resource usage, and alert visibility** in one place.
+---
+
+## 🏛️ Architecture
+
+```mermaid
+flowchart LR
+    subgraph Ingestion [Telemetry Ingestion]
+        Nodes[K8s Pods / AWS ECS] -->|OTel Traces & Metrics| Collector[OpenTelemetry Collector]
+    end
+    subgraph StorageAndAlerting [State & Query]
+        Collector --> Prom[(Prometheus TSDB)]
+        Prom --> AlertManager[AlertManager -> Slack / PagerDuty]
+    end
+    subgraph Presentation [Visualization]
+        Prom --> Grafana[Grafana Dashboards]
+        Prom --> CustomAPI[Dashboard Analytics API]
+    end
+```
+
+---
+
+## ⚡ Quickstart
+
+```bash
+# 1. Clone
+git clone https://github.com/donny-devops/infra-monitoring-dashboard.git && cd infra-monitoring-dashboard
+
+# 2. Launch Complete Stack
+docker compose up -d
+
+# 3. Open UI
+# Visit http://localhost:3000 (Grafana: admin/admin)
+```
+
+---
 
 ## Overview
 
