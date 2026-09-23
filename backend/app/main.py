@@ -34,8 +34,9 @@ def create_app(config_name=None):
     from app.api.alerts import alerts_bp, rules_bp
     from app.api.insights import insights_bp
     from app.api.maintenance import maintenance_bp
+    from app.api.security import security_bp
 
-    for bp in (health_bp, hosts_bp, ingest_bp, metrics_bp, alerts_bp, rules_bp, insights_bp, maintenance_bp):
+    for bp in (health_bp, hosts_bp, ingest_bp, metrics_bp, alerts_bp, rules_bp, insights_bp, maintenance_bp, security_bp):
         app.register_blueprint(bp)
 
     @app.errorhandler(400)
