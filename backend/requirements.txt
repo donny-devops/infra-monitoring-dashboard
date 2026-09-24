@@ -4,7 +4,7 @@ flask-migrate==4.*
 sqlalchemy==2.0.*
 psycopg2-binary==2.9.*
 redis==5.*
-apscheduler==3.10.*
+apscheduler==3.11.*
 marshmallow==3.*
 marshmallow-sqlalchemy==1.*
 anthropic==0.40.*
