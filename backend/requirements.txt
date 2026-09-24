@@ -11,5 +11,5 @@ anthropic==0.40.*
 python-dotenv==1.*
 httpx==0.27.*
 itsdangerous==2.*
-gunicorn==22.*
+gunicorn==26.*
 structlog==24.*
