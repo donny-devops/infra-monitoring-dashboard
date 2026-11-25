@@ -8,6 +8,38 @@ import app.services.ai_service as ai_svc
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/api/v1/alerts")
 rules_bp = Blueprint("alert_rules", __name__, url_prefix="/api/v1/alert-rules")
 
+STATUSES = {"firing", "acknowledged", "resolved"}
+SEVERITIES = {"info", "warning", "critical"}
+OPERATORS = {"gt", "gte", "lt", "lte"}
+METRICS = {
+    "cpu_pct", "mem_pct", "mem_used_mb", "disk_pct", "disk_used_gb",
+    "net_rx_kbps", "net_tx_kbps", "load_1m", "load_5m", "load_15m",
+}
+
+
+def _int_query(name: str):
+    raw = request.args.get(name)
+    if raw is None:
+        return None
+    if not raw.isdigit():
+        abort(400, description=f"{name} must be a positive integer")
+    return int(raw)
+
+
+def _choice(value, allowed: set[str], field: str) -> str:
+    if value not in allowed:
+        abort(400, description=f"{field} must be one of: {', '.join(sorted(allowed))}")
+    return value
+
+
+def _number(value, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        abort(400, description=f"{field} must be a number")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        abort(400, description=f"{field} must be a finite number")
+    return number
+
 
 def _alert_dict(alert: Alert) -> dict:
     return {
@@ -31,11 +63,11 @@ def _alert_dict(alert: Alert) -> dict:
 def list_alerts():
     q = Alert.query
     if status := request.args.get("status"):
-        q = q.filter_by(status=status)
-    if host_id := request.args.get("host_id"):
-        q = q.filter_by(host_id=int(host_id))
+        q = q.filter_by(status=_choice(status, STATUSES, "status"))
+    if (host_id := _int_query("host_id")) is not None:
+        q = q.filter_by(host_id=host_id)
     if severity := request.args.get("severity"):
-        q = q.filter_by(severity=severity)
+        q = q.filter_by(severity=_choice(severity, SEVERITIES, "severity"))
     alerts = q.order_by(Alert.fired_at.desc()).limit(200).all()
     return jsonify([_alert_dict(a) for a in alerts])
 
@@ -61,7 +93,9 @@ def acknowledge_alert(alert_id):
     if alert.status not in ("firing",):
         abort(409, description=f"Alert is {alert.status}, cannot acknowledge")
     actor = (request.get_json(silent=True) or {}).get("actor", "user")
-    alert.acknowledge(actor)
+    if not isinstance(actor, str) or not actor.strip() or len(actor.strip()) > 80:
+        abort(400, description="actor must be 1-80 characters")
+    alert.acknowledge(actor.strip())
     db.session.commit()
     return jsonify(_alert_dict(alert))
 
@@ -93,7 +127,7 @@ def analyze_alert(alert_id):
     return jsonify({"insight_id": insight.id, "status": insight.status}), 202
 
 
-# ── Alert Rules ──────────────────────────────
+# ── Alert Rules ─────────────────────────────
 
 def _rule_dict(rule: AlertRule) -> dict:
     return {
@@ -109,6 +143,14 @@ def _rule_dict(rule: AlertRule) -> dict:
     }
 
 
+def _duration(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        abort(400, description="duration_secs must be an integer")
+    if not 1 <= value <= 86_400:
+        abort(400, description="duration_secs must be between 1 and 86400")
+    return value
+
+
 @rules_bp.get("")
 def list_rules():
     rules = AlertRule.query.order_by(AlertRule.id).all()
@@ -119,18 +161,25 @@ def list_rules():
 def create_rule():
     data = request.get_json(silent=True) or {}
     required = ("metric_name", "operator", "threshold")
-    for f in required:
-        if f not in data:
-            abort(400, description=f"{f} is required")
-    if data["operator"] not in ("gt", "gte", "lt", "lte"):
-        abort(400, description="operator must be one of: gt, gte, lt, lte")
+    for field in required:
+        if field not in data:
+            abort(400, description=f"{field} is required")
+    metric_name = _choice(data["metric_name"], METRICS, "metric_name")
+    operator = _choice(data["operator"], OPERATORS, "operator")
+    threshold = _number(data["threshold"], "threshold")
+    duration_secs = _duration(data.get("duration_secs", 60))
+    severity = _choice(data.get("severity", "warning"), SEVERITIES, "severity")
+    host_id = data.get("host_id")
+    if host_id is not None:
+        if isinstance(host_id, bool) or not isinstance(host_id, int) or host_id <= 0:
+            abort(400, description="host_id must be a positive integer")
     rule = AlertRule(
-        host_id=data.get("host_id"),
-        metric_name=data["metric_name"],
-        operator=data["operator"],
-        threshold=data["threshold"],
-        duration_secs=data.get("duration_secs", 60),
-        severity=data.get("severity", "warning"),
+        host_id=host_id,
+        metric_name=metric_name,
+        operator=operator,
+        threshold=threshold,
+        duration_secs=duration_secs,
+        severity=severity,
     )
     db.session.add(rule)
     db.session.commit()
@@ -141,9 +190,16 @@ def create_rule():
 def update_rule(rule_id):
     rule = db.get_or_404(AlertRule, rule_id)
     data = request.get_json(silent=True) or {}
-    for field in ("threshold", "duration_secs", "severity", "is_active"):
-        if field in data:
-            setattr(rule, field, data[field])
+    if "threshold" in data:
+        rule.threshold = _number(data["threshold"], "threshold")
+    if "duration_secs" in data:
+        rule.duration_secs = _duration(data["duration_secs"])
+    if "severity" in data:
+        rule.severity = _choice(data["severity"], SEVERITIES, "severity")
+    if "is_active" in data:
+        if not isinstance(data["is_active"], bool):
+            abort(400, description="is_active must be a boolean")
+        rule.is_active = data["is_active"]
     db.session.commit()
     return jsonify(_rule_dict(rule))
 
