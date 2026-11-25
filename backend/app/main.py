@@ -3,7 +3,7 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-from app.config import config
+from app.config import assert_production_safe, config
 from app.extensions import db, migrate, init_redis
 
 load_dotenv()
@@ -17,6 +17,8 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    if config_name == "production":
+        assert_production_safe(app.config)
 
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
