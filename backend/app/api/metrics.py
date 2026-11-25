@@ -6,12 +6,36 @@ from app.models.host import Host
 from app.models.metric_snapshot import MetricSnapshot
 from app.services.metric_service import get_latest_cached, get_time_series
 from app.utils.sse import sse_stream
+import json
 
 metrics_bp = Blueprint("metrics", __name__, url_prefix="/api/v1")
 
 VALID_METRICS = {
     "cpu_pct", "mem_pct", "disk_pct", "net_rx_kbps", "net_tx_kbps", "load_1m", "load_5m", "load_15m"
 }
+MAX_WINDOW = timedelta(days=7)
+
+
+def _aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _window():
+    now = datetime.now(timezone.utc)
+    raw_from = request.args.get("from")
+    raw_to = request.args.get("to")
+    try:
+        from_dt = _aware(datetime.fromisoformat(raw_from)) if raw_from else now - timedelta(hours=1)
+        to_dt = _aware(datetime.fromisoformat(raw_to)) if raw_to else now
+    except ValueError:
+        abort(400, description="Invalid from/to datetime format")
+    if to_dt <= from_dt:
+        abort(400, description="to must be after from")
+    if to_dt - from_dt > MAX_WINDOW:
+        abort(400, description="time window cannot exceed 7 days")
+    return from_dt, to_dt
 
 
 @metrics_bp.get("/hosts/<int:host_id>/metrics/latest")
@@ -33,15 +57,7 @@ def host_metrics(host_id):
     if metric not in VALID_METRICS:
         abort(400, description=f"Invalid metric. Choose from: {', '.join(sorted(VALID_METRICS))}")
 
-    now = datetime.now(timezone.utc)
-    from_dt = request.args.get("from")
-    to_dt = request.args.get("to")
-    try:
-        from_dt = datetime.fromisoformat(from_dt) if from_dt else now - timedelta(hours=1)
-        to_dt = datetime.fromisoformat(to_dt) if to_dt else now
-    except ValueError:
-        abort(400, description="Invalid from/to datetime format")
-
+    from_dt, to_dt = _window()
     span = (to_dt - from_dt).total_seconds()
     resolution = 1 if span <= 3600 else 5 if span <= 21600 else 60
 
@@ -61,8 +77,10 @@ def host_metrics_stream(host_id):
             while time.time() < deadline:
                 msg = pubsub.get_message(timeout=15)
                 if msg and msg["type"] == "message":
-                    import json
-                    yield json.loads(msg["data"])
+                    try:
+                        yield json.loads(msg["data"])
+                    except (TypeError, ValueError):
+                        continue
                 else:
                     yield None
         finally:
@@ -82,8 +100,10 @@ def all_metrics_stream():
             while time.time() < deadline:
                 msg = pubsub.get_message(timeout=15)
                 if msg and msg["type"] == "pmessage":
-                    import json
-                    yield json.loads(msg["data"])
+                    try:
+                        yield json.loads(msg["data"])
+                    except (TypeError, ValueError):
+                        continue
                 else:
                     yield None
         finally:
